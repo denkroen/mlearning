@@ -92,6 +92,9 @@ def main():
     combined_predictions = combined_predictions.drop('Unnamed: 0', axis=1)
     combined_predictions.to_csv('auto_predictions_finalv2.csv')
 
+if __name__ == "__main__":
+    main()
+
 
 
 
