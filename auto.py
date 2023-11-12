@@ -18,61 +18,46 @@ def main():
     label = 'pv_measurement'
     test_data = TabularDataset(f'A/preproc_train_estimated_A.csv')
 
-    filter1 = [col for col in train_data.columns if "snow" not in col]
-    filter2 = [col for col in test_data.columns if "snow" not in col]
+    test_data["is_estimated"] = pd.Series([1] * len(test_data), name='is_estimated')
+    train_data["is_estimated"] = pd.Series([0] * len(train_data), name='is_estimated')
 
-    
-
-    train_data = train_data[filter1]
-    test_data = test_data[filter2]
-
-    #train_data = train_data.drop("wind_speed_w_1000hPa:ms",axis=1)
-    #test_data = test_data.drop("wind_speed_w_1000hPa:ms",axis=1)
-    #train_data = train_data.drop("elevation:m",axis=1)
-    #test_data = test_data.drop("elevation:m",axis=1)
-
-    
 
     percentage = 0.50
     num_rows = int(len(test_data) * percentage)
     sample = test_data.sample(n=num_rows, random_state=42)
     test_data = test_data.drop(sample.index)
-    #percentage2 = 0.8
-    #num_rows2 = int(len(train_data) * percentage2)
-    #train_data = train_data.sample(n=num_rows2, random_state=42)
+
     train_data = pd.concat([train_data,sample]).reset_index(drop=True)
 
     train_data = create_wind(train_data)
     test_data = create_wind(test_data)
 
 
-    amount_features_1 = 15
-    amount_features_final = 37
-
     predictor = TabularPredictor(label=label, eval_metric='mean_absolute_error').fit(train_data, tuning_data=test_data)
 
-    x = predictor.feature_importance(test_data)
-
-    print(x)
+    #x = predictor.feature_importance(test_data)
+    #print(x)
 
 
     submission_data = TabularDataset('A/preproc_test_estimated_A.csv')
+
     submission_data = create_wind(submission_data)
-    #submission_data = submission_data.drop("wind_speed_w_1000hPa:ms",axis=1)
-    #submission_data = submission_data.drop("elevation:m",axis=1)
+    submission_data["is_estimated"] = pd.Series([1] * len(submission_data), name='is_estimated')
+
 
 
     predictions_A = predictor.predict(submission_data)
 
-    ########
-
-    predictions_A.to_csv('temp_a.csv')
+ 
 
     ##########B
 
     train_data = TabularDataset('B/preproc_train_observed_B.csv')
     label = 'pv_measurement'
     test_data = TabularDataset(f'B/preproc_train_estimated_B.csv')
+
+    test_data["is_estimated"] = pd.Series([1] * len(test_data), name='is_estimated')
+    train_data["is_estimated"] = pd.Series([0] * len(train_data), name='is_estimated')
 
     percentage = 0.50
     num_rows = int(len(test_data) * percentage)
@@ -81,12 +66,22 @@ def main():
     train_data = pd.concat([train_data,sample]).reset_index(drop=True)
     #train_data = pd.concat([train_data,test_data],ignore_index=True)
 
-    predictor = TabularPredictor(label=label, eval_metric='mean_absolute_error').fit(train_data, presets='best_quality', ag_args_fit={'num_gpus':1}, num_stack_levels=0,tuning_data=test_data,use_bag_holdout=True)
-    x = predictor.feature_importance(test_data)
+    train_data = create_wind(train_data)
+    test_data = create_wind(test_data)
 
-    print(x)
+    predictor = TabularPredictor(label=label, eval_metric='mean_absolute_error').fit(train_data, presets='best_quality', ag_args_fit={'num_gpus':1}, num_stack_levels=0,tuning_data=test_data,use_bag_holdout=True)
+    #x = predictor.feature_importance(test_data)
+    #print(x)
 
     submission_data = TabularDataset('B/preproc_test_estimated_B.csv')
+    submission_data = submission_data.reset_index()
+    submission_data = create_wind(submission_data)
+    submission_data["is_estimated"] = pd.Series([1] * len(submission_data), name='is_estimated')
+
+
+    #submission_data.rename(columns={"index": "date_forecast"},inplace=True)
+
+
 
     predictions_B = predictor.predict(submission_data)
 
@@ -97,20 +92,33 @@ def main():
     test_data = TabularDataset(f'C/preproc_train_estimated_C.csv')
     #train_data = pd.concat([train_data,test_data],ignore_index=True)
 
+    test_data["is_estimated"] = pd.Series([1] * len(test_data), name='is_estimated')
+    train_data["is_estimated"] = pd.Series([0] * len(train_data), name='is_estimated')
+
     percentage = 0.50
     num_rows = int(len(test_data) * percentage)
     sample = test_data.sample(n=num_rows, random_state=42)
     test_data = test_data.drop(sample.index)
     train_data = pd.concat([train_data,sample]).reset_index(drop=True)
 
+    train_data = create_wind(train_data)
+    test_data = create_wind(test_data)
 
 
-    predictor = TabularPredictor(label=label, eval_metric='mean_absolute_error').fit(train_data, presets='best_quality', ag_args_fit={'num_gpus':1}, num_stack_levels=0,tuning_data=test_data,use_bag_holdout=True)
-    x = predictor.feature_importance(test_data)
 
-    print(x)
+    predictor = TabularPredictor(label=label, eval_metric='mean_absolute_error').fit(train_data,tuning_data=test_data)
+    #x = predictor.feature_importance(test_data)
+
+    #print(x)
 
     submission_data = TabularDataset('C/preproc_test_estimated_C.csv')
+    submission_data = submission_data.reset_index()
+    submission_data = create_wind(submission_data)
+    submission_data["is_estimated"] = pd.Series([1] * len(submission_data), name='is_estimated')
+
+
+    #submission_data.rename(columns={"index": "date_forecast"},inplace=True)
+
 
     predictions_C = predictor.predict(submission_data)
 
@@ -126,7 +134,9 @@ def main():
     combined_predictions.index.name = 'id'
     combined_predictions.rename('prediction', inplace=True)
     # combined_predictions = combined_predictions.drop('Unnamed: 0', axis=1)
-    combined_predictions.to_csv('auto_predictions_finalv31_bare_50_80.csv')
+    combined_predictions.to_csv('auto_predictions_finalVidk.csv')
+
+
 
 
 
@@ -136,11 +146,10 @@ def create_wind(df):
 
     df["windSpeed"] = np.sqrt(df["wind_speed_u_10m:ms"]**2 + df["wind_speed_v_10m:ms"]**2)
     df["windAngle"] = np.arctan2(df["wind_speed_v_10m:ms"], df["wind_speed_u_10m:ms"])
-
-    ###
-    df["global_rad"] = df["direct_rad:W"] +df["diffuse_rad:W"]
-
+   
     return df
+
+
 
 
 def feature_expansion(df):
